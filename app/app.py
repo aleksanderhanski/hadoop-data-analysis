@@ -1,6 +1,8 @@
 import streamlit as st
 from pyspark.sql import SparkSession, functions as F
 import pandas as pd
+import numpy as np
+import pydeck as pdk
 
 PARQUET_PATH = "hdfs://namenode:9000/parquet/yellow_taxi"
 st.set_page_config(page_title="NYC Taxi Explorer", layout="wide")
@@ -52,7 +54,8 @@ def q_pickup_hotspots(months):
             .withColumn("lat", F.round("pickup_lat", 3))
             .withColumn("lon", F.round("pickup_lon", 3))
             .groupBy("lat", "lon").count()
-            .orderBy(F.desc("count")).limit(200).toPandas())
+            .filter(F.col("count") >= 30)
+            .orderBy(F.desc("count")).limit(5000).toPandas())
 
 
 @st.cache_data
@@ -63,7 +66,8 @@ def q_dropoff_hotspots(months):
             .withColumn("lat", F.round("dropoff_lat", 3))
             .withColumn("lon", F.round("dropoff_lon", 3))
             .groupBy("lat", "lon").count()
-            .orderBy(F.desc("count")).limit(200).toPandas())
+            .filter(F.col("count") >= 30)
+            .orderBy(F.desc("count")).limit(5000).toPandas())
 
 
 @st.cache_data
@@ -117,8 +121,34 @@ def recommend_cheapest_ride(months):
             .orderBy(F.asc("fare_per_mile")).limit(10).toPandas())
 
 
-# ----------------------------- UI -----------------------------
+# graded map: brighter + bigger where busier
+def graded_map(df):
+    d = df.copy()
+    c = d["count"].astype(float)
+    # log scale, because counts are very skewed (a few huge cells, many small)
+    lo, hi = np.log(c.min()), np.log(c.max())
+    norm = ((np.log(c) - lo) / (hi - lo + 1e-9)).clip(0, 1)
+    # dim blue (rare) -> bright yellow (common)
+    d["color"] = [[int(40 + 215 * n), int(40 + 180 * n), int(140 * (1 - n) + 30), 200]
+                  for n in norm]
+    d["radius"] = 30 + 170 * norm
+    layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=d,
+        get_position="[lon, lat]",
+        get_fill_color="color",
+        get_radius="radius",
+        radius_min_pixels=2,
+        radius_max_pixels=22,
+        opacity=0.8,
+        pickable=True,
+    )
+    view = pdk.ViewState(latitude=40.75, longitude=-73.98, zoom=10)
+    st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view,
+                             map_style=None, tooltip={"text": "{count} trips"}))
 
+
+# ----------------------------- UI -----------------------------
 st.title("🚕 NYC Taxi Explorer 🚕")
 months = tuple(st.sidebar.multiselect("Filter by month",
                                        available_months(), default=available_months()))
@@ -144,14 +174,16 @@ elif view == "Fare per mile by hour":
 
 elif view == "Pickup hotspots":
     st.subheader("Busiest pickup locations")
+    st.caption("Brighter and bigger = more pickups. Faint blue points are quieter spots.")
     d = q_pickup_hotspots(months)
-    st.map(d, latitude="lat", longitude="lon")
+    graded_map(d)
     st.dataframe(d, use_container_width=True)
 
 elif view == "Dropoff hotspots":
     st.subheader("Busiest dropoff locations")
+    st.caption("Brighter and bigger = more dropoffs. Faint blue points are quieter spots.")
     d = q_dropoff_hotspots(months)
-    st.map(d, latitude="lat", longitude="lon")
+    graded_map(d)
     st.dataframe(d, use_container_width=True)
 
 elif view == "Tipping by hour (card)":
