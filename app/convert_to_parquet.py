@@ -24,6 +24,8 @@ clean = (
         F.col("trip_distance").cast("double").alias("trip_distance"),
         F.col("pickup_longitude").cast("double").alias("pickup_lon"),
         F.col("pickup_latitude").cast("double").alias("pickup_lat"),
+        F.col("dropoff_longitude").cast("double").alias("dropoff_lon"),
+        F.col("dropoff_latitude").cast("double").alias("dropoff_lat"),
         F.col("payment_type").cast("int").alias("payment_type"),
         F.col("fare_amount").cast("double").alias("fare_amount"),
         F.col("tip_amount").cast("double").alias("tip_amount"),
