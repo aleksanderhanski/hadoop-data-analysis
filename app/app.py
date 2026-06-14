@@ -105,20 +105,36 @@ def q_volume_by_weekday(months):
 
 
 @st.cache_data
-def recommend_cheapest_ride(months):
+def recommend_best_time(months):
     return (filtered_df(months)
-            .filter(F.col("pickup_lat").between(40.4, 41.0) &
-                    F.col("pickup_lon").between(-74.3, -73.6))
-            .filter(F.col("trip_distance") >= 1)          # keep per-mile rate meaningful
+            .filter(F.col("trip_distance") >= 1)
             .withColumn("weekday", F.date_format("pickup_ts", "EEEE"))
-            .withColumn("lat", F.round("pickup_lat", 2))
-            .withColumn("lon", F.round("pickup_lon", 2))
-            .groupBy("weekday", "pickup_hour", "lat", "lon")
-            .agg(F.round(F.sum("fare_amount") / F.sum("trip_distance"), 2)
-                 .alias("fare_per_mile"),
-                 F.count("*").alias("trips"))
-            .filter(F.col("trips") > 200)                 # enough trips for a stable rate
-            .orderBy(F.asc("fare_per_mile")).limit(10).toPandas())
+            .groupBy("weekday", "pickup_hour")
+            .agg(
+                F.round(F.sum("fare_amount") / F.sum("trip_distance"), 2).alias("fare_per_mile"),
+                F.count("*").alias("trips"),
+            )
+            .filter(F.col("trips") > 500)
+            .toPandas())
+
+
+def score_recommendations(df, business_hours_only):
+    d = df.copy()
+    if business_hours_only:
+        d = d[d["pickup_hour"].between(7, 22)]
+    if d.empty:
+        return d
+    lo_f, hi_f = d["fare_per_mile"].min(), d["fare_per_mile"].max()
+    lo_t, hi_t = d["trips"].min(), d["trips"].max()
+    d["norm_fare"] = (d["fare_per_mile"] - lo_f) / (hi_f - lo_f + 1e-9)
+    d["norm_avail"] = (d["trips"] - lo_t) / (hi_t - lo_t + 1e-9)
+    d["score"] = (0.6 * (1 - d["norm_fare"]) + 0.4 * d["norm_avail"]).round(3)
+    order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    d["weekday"] = pd.Categorical(d["weekday"], categories=order, ordered=True)
+    return (d.sort_values("score", ascending=False)
+             .drop(columns=["norm_fare", "norm_avail"])
+             .head(10)
+             .reset_index(drop=True))
 
 
 # graded map: brighter + bigger where busier
@@ -156,7 +172,7 @@ view = st.sidebar.radio("Choose an analysis", [
     "Demand by hour", "Fare per mile by hour",
     "Pickup hotspots", "Dropoff hotspots", "Tipping by hour (card)",
     "Distance vs fare", "Trips by day of week",
-    "★ Recommendation: cheapest ride",
+    "★ Recommendation: best time to ride",
 ])
 
 if view == "Demand by hour":
@@ -212,14 +228,23 @@ elif view == "Trips by day of week":
     st.dataframe(d, use_container_width=True)
 
 else:
-    st.subheader("Cheapest time & place to take a taxi")
-    st.caption("Lowest fare per mile - when and where a ride costs least per distance "
-               "travelled, which mostly reflects lighter traffic.")
-    d = recommend_cheapest_ride(months)
+    st.subheader("Best time to take a taxi")
+    st.caption(
+        "Scored by a combination of low fare per mile (60 %) and high trip availability (40 %). "
+        )
+    business_hours = st.toggle("Business hours only (7 AM - 10 PM)", value=True)
+    d = score_recommendations(recommend_best_time(months), business_hours)
     if not d.empty:
         t = d.iloc[0]
-        st.success(f"Cheapest: {t['weekday']} around {int(t['pickup_hour'])}:00 near "
-                   f"({t['lat']}, {t['lon']}) - about ${t['fare_per_mile']:.2f} per mile "
-                   f"across {int(t['trips'])} trips.")
-        st.map(d, latitude="lat", longitude="lon")
-    st.dataframe(d, use_container_width=True)
+        st.success(
+            f"Best time: {t['weekday']} around {int(t['pickup_hour'])}:00 - "
+            f"${t['fare_per_mile']:.2f}/mile, "
+            f"{int(t['trips'])} trips recorded. Score: {t['score']:.3f}"
+        )
+    st.dataframe(
+        d.rename(columns={
+            "pickup_hour": "hour",
+            "fare_per_mile": "fare/mile ($)",
+        }),
+        use_container_width=True,
+    )
