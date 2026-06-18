@@ -2,7 +2,7 @@
 
 A big-data analysis app built on **Apache Hadoop (HDFS)**, **PySpark**, and
 **Streamlit**, fully containerized with **Docker**. It loads NYC yellow taxi trip
-data (2015–2016) into HDFS, processes it with Spark, and serves an interactive
+data (2015-2016) into HDFS, processes it with Spark, and serves an interactive
 dashboard for browsing the data.
 
 ## Architecture
@@ -19,6 +19,8 @@ Data flow: `Kaggle → ./data → HDFS (CSV) → Spark → HDFS (Parquet) → St
 ### Busiest pickup locations
 
 ![Busiest pickup locations](images/busiest_pickup_locations.png)
+
+***
 
 ### Average fare per mile by trip distance
 
@@ -41,7 +43,7 @@ docker compose up -d
 
 # 3. Wait for HDFS to finish starting up.
 #    This BLOCKS until the namenode leaves safe mode and returns as soon as
-#    it's ready — so you never start the download before HDFS can accept writes.
+#    it's ready - so you never start the download before HDFS can accept writes.
 docker compose exec namenode hdfs dfsadmin -safemode wait
 
 # 4. Download the dataset and load it into HDFS
@@ -54,20 +56,20 @@ docker compose exec app python convert_to_parquet.py
 #    http://localhost:8501
 ```
 
-Steps 3–4 take a few minutes — the dataset is ~1.8 GB and the conversion scans all of it once.
+Steps 3-4 take a few minutes - the dataset is ~1.8 GB and the conversion scans all of it once.
 
 ## Notes & troubleshooting
 
 - **Step 3 is the wait.** `hdfs dfsadmin -safemode wait` blocks until the namenode
   has finished starting and left safe mode. If you skip it and step 4 fails with
   **"Name node is in safe mode,"** just run step 3 (or force it out with
-  `docker compose exec namenode hdfs dfsadmin -safemode leave`) and re-run step 4 —
+  `docker compose exec namenode hdfs dfsadmin -safemode leave`) and re-run step 4 -
   the download is cached, so it only re-copies.
 - **If step 3 itself errors** with a connection issue, the namenode container is still
-  booting up — wait a couple of seconds and re-run step 3.
+  booting up - wait a couple of seconds and re-run step 3.
 - **If step 4 or the app dies with `ConnectionRefusedError [Errno 111]`,** the Spark
   JVM ran out of memory and crashed. Both `app/convert_to_parquet.py` and `app/app.py`
-  use `.master("local[4]")` — lower the number (e.g. `local[2]` or `local[1]`) in
+  use `.master("local[4]")` - lower the number (e.g. `local[2]` or `local[1]`) in
   **both** files to reduce how many workers run in parallel and the peak memory they use,
   then re-run step 4 and rebuild the app. Fewer workers is slower but uses less memory.
 - **Verify the data landed:**
@@ -110,10 +112,10 @@ Pick an analysis from the sidebar; the month filter applies to every view.
 
 ## Data
 
-The dataset is **not committed** (~1.8 GB) — `download_data.py` fetches it on demand.
+The dataset is **not committed** (~1.8 GB) - `download_data.py` fetches it on demand.
 The `data/` folder is kept in git via `.gitkeep` so it exists on a fresh clone with the
 correct ownership.
 
 Dataset: [NYC Yellow Taxi Trip Data](https://www.kaggle.com/datasets/elemento/nyc-yellow-taxi-trip-data)
-(Jan 2015 + Jan–Mar 2016). Location is stored as GPS coordinates (this vintage predates
+(Jan 2015 + Jan-Mar 2016). Location is stored as GPS coordinates (this vintage predates
 the TLC zone-ID format).
