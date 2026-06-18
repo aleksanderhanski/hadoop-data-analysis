@@ -1,6 +1,7 @@
 """One-time CSV -> Parquet conversion. Run inside the app container:
     docker compose exec app python convert_to_parquet.py
 """
+
 from pyspark.sql import SparkSession, functions as F
 
 CSV_PATH = "hdfs://namenode:9000/data/*.csv"
@@ -9,7 +10,7 @@ PARQUET_PATH = "hdfs://namenode:9000/parquet/yellow_taxi"
 spark = (
     SparkSession.builder
     .appName("csv-to-parquet")
-    .master("local[*]")
+    .master("local[4]")
     .getOrCreate()
 )
 
