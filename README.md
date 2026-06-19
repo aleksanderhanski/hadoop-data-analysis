@@ -18,13 +18,13 @@ Data flow: `Kaggle → ./data → HDFS (CSV) → Spark → HDFS (Parquet) → St
 
 ### Busiest pickup locations
 
-![Busiest pickup locations](images/busiest_pickup_locations.png)
+![Busiest pickup locations](docs/images/busiest_pickup_locations.png)
 
 ***
 
 ### Average fare per mile by trip distance
 
-![Average fare per mile by trip distance](images/fare_per_mile.png)
+![Average fare per mile by trip distance](docs/images/fare_per_mile.png)
 
 ## Prerequisites
 
@@ -112,10 +112,9 @@ Pick an analysis from the sidebar; the month filter applies to every view.
 
 ## Data
 
-The dataset is **not committed** (~1.8 GB) - `download_data.py` fetches it on demand.
+The dataset is not committed (~1.8 GB) - `download_data.py` fetches it on demand.
 The `data/` folder is kept in git via `.gitkeep` so it exists on a fresh clone with the
 correct ownership.
 
 Dataset: [NYC Yellow Taxi Trip Data](https://www.kaggle.com/datasets/elemento/nyc-yellow-taxi-trip-data)
-(Jan 2015 + Jan-Mar 2016). Location is stored as GPS coordinates (this vintage predates
-the TLC zone-ID format).
+(Jan 2015 + Jan-Mar 2016). Location is stored as GPS coordinates.
